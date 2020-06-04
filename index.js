@@ -46,7 +46,7 @@ exports.constructAttachments = (statuses, now, timezone) => {
 }
 
 exports.handler = (event, context, callback) => {
-  let timezone = process.env.TIMEZONE;      // e.g. Asia/Tokyo
+  let timezone = process.env.TZ;      // e.g. Asia/Tokyo
   let webHookURL = process.env.WEBHOOK_URL;
 
   if (!process.env.TZ && timezone != '') {
