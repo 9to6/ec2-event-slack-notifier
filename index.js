@@ -47,6 +47,7 @@ exports.constructAttachments = (statuses, now, timezone) => {
 
 exports.handler = (event, context, callback) => {
   let timezone = process.env.TZ;      // e.g. Asia/Tokyo
+  let slackChannel = process.env.SLACK_CHANNEL;      // e.g. Asia/Tokyo
   let webHookURL = process.env.WEBHOOK_URL;
 
   if (!process.env.TZ && timezone != '') {
@@ -68,6 +69,9 @@ exports.handler = (event, context, callback) => {
       text: ':warning: There are some EC2 Scheduled Events. :warning:',
       attachments: attachments,
     };
+    if (slackChannel) {
+      message['channel'] = slackChannel;
+    }
 
     let options = {
       method: 'POST',
