@@ -15,34 +15,71 @@ exports.constructAttachments = (statuses, now, timezone) => {
       let eventFrom = event.NotBefore == undefined ? '' : moment(event.NotBefore).tz(timezone).format('YYYY-MM-DD kk:mm:ss ZZ');
       let eventTo = event.NotAfter == undefined ? '' : moment(event.NotAfter).tz(timezone).format('YYYY-MM-DD kk:mm:ss ZZ');
 
+      var fields = [
+        {
+          title: 'Instance',
+          value: status.InstanceId,
+          short: true,
+        },
+        {
+          title: 'Event Type',
+          value: event.Code,
+          short: true,
+        },
+        {
+          title: 'Duration',
+          value: `${eventFrom} - ${eventTo}`,
+          short: false,
+        },
+        {
+          title: 'Description',
+          value: event.Description,
+          short: false,
+        },
+      ];
+      if (status.Tags != undefined) {
+        status.Tags.forEach(tag => {
+          if (tag.Key == "Name") {
+            fields.push(
+              {
+                title: 'Name',
+                value: tag.Value,
+                short: false,
+              });
+          } else if (tag.Key == "Owner") {
+            fields.push(
+              {
+                title: 'Owner',
+                value: "@"+tag.Value,
+                short: false,
+              });
+          }
+        })
+      }
+
       return {
         fallback: `${status.InstanceId} / ${event.Code} / ${eventFrom} - ${eventTo} / ${event.Description}`,
         color: color,
-        fields: [
-          {
-            title: 'Instance',
-            value: status.InstanceId,
-            short: true,
-          },
-          {
-            title: 'Event Type',
-            value: event.Code,
-            short: true,
-          },
-          {
-            title: 'Duration',
-            value: `${eventFrom} - ${eventTo}`,
-            short: false,
-          },
-          {
-            title: 'Description',
-            value: event.Description,
-            short: false,
-          },
-        ],
+        fields: fields,
       };
     });
   }).filter(a => a.length > 0).reduce((r, v) => r.concat(v), []).filter(a => a != null);
+}
+
+exports.getTags = (ec2, statuses) => {
+  let eventInstanceIds = statuses.map(item => {
+    return item.InstanceId;
+  })
+  var instanceTagInfos = [];
+  let ec2DescribePromise = ec2.describeInstances({InstanceIds: eventInstanceIds}).promise();
+
+  return ec2DescribePromise.then(data => {
+    var instances = data.Reservations[0].Instances;
+    statuses.forEach((e, index) => e.Tags = instances[index].Tags);
+    return statuses
+  }).catch(err => {
+    return statuses;
+  })
 }
 
 exports.handler = (event, context, callback) => {
@@ -59,6 +96,10 @@ exports.handler = (event, context, callback) => {
 
   describeInstanceStatusPromise.then(data => {
     let statuses = data.InstanceStatuses.filter(v => v.Events.length > 0);
+    return statuses;
+  }).then(statuses => {
+    return this.getTags(ec2, statuses)
+  }).then(statuses =>  {
     let attachments = this.constructAttachments(statuses, new Date(), timezone);
 
     if (attachments.length == 0) {
@@ -68,6 +109,7 @@ exports.handler = (event, context, callback) => {
     let message = {
       text: ':warning: There are some EC2 Scheduled Events. :warning:',
       attachments: attachments,
+      link_names: 1
     };
     if (slackChannel) {
       message['channel'] = slackChannel;
