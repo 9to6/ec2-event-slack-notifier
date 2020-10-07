@@ -74,8 +74,7 @@ exports.getTags = (ec2, statuses) => {
   let ec2DescribePromise = ec2.describeInstances({InstanceIds: eventInstanceIds}).promise();
 
   return ec2DescribePromise.then(data => {
-    var instances = data.Reservations[0].Instances;
-    statuses.forEach((e, index) => e.Tags = instances[index].Tags);
+    statuses.forEach((e, index) => e.Tags = data.Reservations[index].Instances[0].Tags);
     return statuses
   }).catch(err => {
     return statuses;
